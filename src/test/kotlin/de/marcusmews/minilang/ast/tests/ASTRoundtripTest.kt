@@ -16,6 +16,7 @@ import kotlin.test.fail
  */
 class ASTRoundtripTest {
 
+    /** Checks that programs can be serialized back again to their original source code */
     @Test
     fun testASTGeneratorFormatterParser() {
         val seed = 42L

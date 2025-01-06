@@ -24,6 +24,7 @@ enum class IssueKind {
     Info
 }
 
+/** Returns the range of a given parser context of ANTLR */
 fun getRange(ctx: ParserRuleContext) : Range {
     val start = Position(ctx.start.line - 1, ctx.start.charPositionInLine)
     val end = Position(ctx.stop.line - 1, ctx.stop.charPositionInLine)

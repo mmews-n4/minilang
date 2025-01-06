@@ -2,6 +2,7 @@ package de.marcusmews.minilang.ast
 
 class ASTPrinter {
 
+    /** Creates a string from the given program. */
     fun generate(program: Program): String {
         return program.statements.joinToString("\n") { generateStatement(it) }
     }

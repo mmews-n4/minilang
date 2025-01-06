@@ -10,6 +10,7 @@ import kotlin.test.fail
 
 class ASTParentsTest {
 
+    /** Checks that all AST source elements (but the program root) have a parent source element */
     @Test
     fun testASTSourceElementsHaveParents() {
         val seed = 42L

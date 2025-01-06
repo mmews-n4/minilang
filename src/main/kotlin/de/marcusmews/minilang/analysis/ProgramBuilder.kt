@@ -8,9 +8,12 @@ import org.apache.commons.collections4.multimap.ArrayListValuedHashMap
 class ProgramBuilder {
     private val scopes = HashMap<SourceElement, Scope>()
 
+    /** Creates a ProgramInfo from a given ASTInfo */
     fun build(astInfo: ASTInfo) : ProgramInfo {
+        // compute scopes
         scopes.clear()
         traverse(astInfo.program)
+
         return ProgramInfo(astInfo.program, astInfo.parents, astInfo.sourceLocations, scopes)
     }
 
@@ -35,7 +38,7 @@ class ProgramBuilder {
 
     private fun traverse(expr: Expression?) {
         when (expr) {
-            null -> return
+            null                        -> return
             is MapExpression            -> traverse(expr)
             is ReduceExpression         -> traverse(expr)
             is ParenthesizedExpression  -> traverse(expr.expression)

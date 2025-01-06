@@ -9,6 +9,7 @@ import kotlin.test.fail
 
 class ASTBrokenTest {
 
+    /** Checks that incorrect programs can be parsed without exceptions */
     @Test
     fun testASTGeneratorFormatterParser() {
         val seed = 42L

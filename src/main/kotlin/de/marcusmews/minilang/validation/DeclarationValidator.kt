@@ -2,6 +2,9 @@ package de.marcusmews.minilang.validation
 
 import de.marcusmews.minilang.ast.*
 
+/**
+ * Contains validations regarding declarations and its misuses
+ */
 class DeclarationValidator(issueHandler: IssueHandler, programInfo: ProgramInfo): BaseValidator(issueHandler, programInfo) {
 
     override fun onIdentifierExpression(node: IdentifierExpression, parent: SourceElement?, parentProperty: String?) {

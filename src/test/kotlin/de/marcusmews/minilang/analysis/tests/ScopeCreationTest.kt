@@ -8,6 +8,7 @@ import kotlin.test.assertEquals
 
 class ScopeCreationTest {
 
+    /** Checks that the correct number of scopes is created */
     @Test
     fun testCreateScopes() {
         val seed = 42L

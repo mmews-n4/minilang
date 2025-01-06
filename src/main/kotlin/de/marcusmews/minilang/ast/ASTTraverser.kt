@@ -1,9 +1,10 @@
 package de.marcusmews.minilang.ast
 
 
+/** Traverses the given program and calls callback methods of given visitors */
 fun traverse(programInfo: ProgramInfo, visitors: List<ASTVisitor>) {
-    dispatchValidate(visitors, programInfo.program, null, null)
-    traverse(programInfo.program) { node, parent, parentProperty -> dispatchValidate(visitors, node, parent, parentProperty) }
+    dispatchVisit(visitors, programInfo.program, null, null)
+    traverse(programInfo.program) { node, parent, parentProperty -> dispatchVisit(visitors, node, parent, parentProperty) }
 }
 
 private fun traverse(node: SourceElement?, onVisit: (node: SourceElement?, parent: SourceElement?, parentProperty: String?) -> Unit) {
@@ -36,20 +37,20 @@ private fun traverse(node: SourceElement?, onVisit: (node: SourceElement?, paren
                 onVisit(child, node, property.name)
                 traverse(child, onVisit)
             }
-            null -> {
+            null        -> {
                 onVisit(null, node, property.name)
             }
             is Operator -> {/* ignore */}
-            is Double -> {/* ignore */}
-            is String -> {/* ignore */}
-            else -> {
+            is Double   -> {/* ignore */}
+            is String   -> {/* ignore */}
+            else        -> {
                 throw IllegalArgumentException("Unsupported element found in AST")
             }
         }
     }
 }
 
-private fun dispatchValidate(visitors: List<ASTVisitor>, node: SourceElement?, parent: SourceElement?, parentProperty: String?) {
+private fun dispatchVisit(visitors: List<ASTVisitor>, node: SourceElement?, parent: SourceElement?, parentProperty: String?) {
     for (visitor in visitors) {
         if (node == null) {
             if (parent != null && parentProperty != null) {
