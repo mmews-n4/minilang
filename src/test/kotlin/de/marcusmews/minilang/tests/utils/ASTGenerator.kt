@@ -1,12 +1,14 @@
 package de.marcusmews.minilang.tests.utils
 
 import de.marcusmews.minilang.ast.*
+import org.antlr.v4.runtime.ParserRuleContext
 import kotlin.random.Random
 
 /**
  * This utility generates arbitrary ASTs of valid Minilang programs.
  */
 class ASTGenerator {
+    private val mockCtx = ParserRuleContext()
 
     fun generateASTs(seed: Long, count: Int): List<Program> {
         val random = Random(seed)
@@ -14,65 +16,65 @@ class ASTGenerator {
     }
 
     private fun generateRandomAST(random: Random): Program {
-        val statements = List(random.nextInt(1, 5)) { generateRandomStatement(random) }
-        return Program(statements)
+        val statements = List(random.nextInt(1, 5)) { idx -> generateRandomStatement(idx, random) }
+        return Program(mockCtx, statements)
     }
 
-    private fun generateRandomStatement(random: Random): Statement {
+    private fun generateRandomStatement(position: Int, random: Random): Statement {
         return when (random.nextInt(3)) {
-            0 -> generateRandomVariableDeclaration(random)
-            1 -> generateRandomOutputStatement(random)
-            2 -> generateRandomPrintStatement(random)
+            0 -> generateRandomVariableDeclaration(position, random)
+            1 -> generateRandomOutputStatement(position, random)
+            2 -> generateRandomPrintStatement(position, random)
             else -> throw IllegalStateException("Unexpected random value")
         }
     }
 
-    private fun generateRandomVariableDeclaration(random: Random): VariableDeclaration {
-        val identifier = "var${random.nextInt(100)}"
+    private fun generateRandomVariableDeclaration(position: Int, random: Random): VariableDeclaration {
+        val identifier = Identifier(mockCtx, "var${random.nextInt(100)}")
         val expression = generateRandomExpression(random)
-        return VariableDeclaration(identifier, expression)
+        return VariableDeclaration(mockCtx, position, identifier, expression)
     }
 
-    private fun generateRandomOutputStatement(random: Random): OutputStatement {
+    private fun generateRandomOutputStatement(position: Int, random: Random): OutputStatement {
         val expression = generateRandomExpression(random)
-        return OutputStatement(expression)
+        return OutputStatement(mockCtx, position, expression)
     }
 
-    private fun generateRandomPrintStatement(random: Random): PrintStatement {
-        val string = "RandomString${random.nextInt(100)}"
-        return PrintStatement(string)
+    private fun generateRandomPrintStatement(position: Int, random: Random): PrintStatement {
+        val string = StringLiteral(mockCtx, "RandomString${random.nextInt(100)}")
+        return PrintStatement(mockCtx, position, string)
     }
 
     private fun generateRandomExpression(random: Random): Expression {
         return when (random.nextInt(7)) {
-            0 -> NumberLiteral(generateNumber(random, -100, 100))
-            1 -> IdentifierExpression("id${random.nextInt(100)}")
-            2 -> BinaryOperation(
+            0 -> NumberLiteral(mockCtx, generateNumber(random, -100, 100))
+            1 -> IdentifierExpression(mockCtx, "id${random.nextInt(100)}")
+            2 -> BinaryOperation(mockCtx,
                 generateRandomExpression(random),
                 generateRandomOperator(random),
                 generateRandomExpression(random)
             )
-            3 -> ParenthesizedExpression(generateRandomExpression(random))
-            4 -> SequenceExpression(
-                NumberLiteral(random.nextInt(0, 10).toDouble()),
-                NumberLiteral(random.nextInt(11, 20).toDouble())
+            3 -> ParenthesizedExpression(mockCtx, generateRandomExpression(random))
+            4 -> SequenceExpression(mockCtx,
+                NumberLiteral(mockCtx, random.nextInt(0, 10).toDouble()),
+                NumberLiteral(mockCtx, random.nextInt(11, 20).toDouble())
             )
-            5 -> MapExpression(
-                SequenceExpression(
-                    NumberLiteral(random.nextInt(0, 10).toDouble()),
-                    NumberLiteral(random.nextInt(11, 20).toDouble())
+            5 -> MapExpression(mockCtx,
+                SequenceExpression(mockCtx,
+                    NumberLiteral(mockCtx, random.nextInt(0, 10).toDouble()),
+                    NumberLiteral(mockCtx, random.nextInt(11, 20).toDouble())
                 ),
-                "param${random.nextInt(10)}",
+                Identifier(mockCtx, "param${random.nextInt(10)}"),
                 generateRandomExpression(random)
             )
-            6 -> ReduceExpression(
-                SequenceExpression(
-                    NumberLiteral(random.nextInt(0, 10).toDouble()),
-                    NumberLiteral(random.nextInt(11, 20).toDouble())
+            6 -> ReduceExpression(mockCtx,
+                SequenceExpression(mockCtx,
+                    NumberLiteral(mockCtx, random.nextInt(0, 10).toDouble()),
+                    NumberLiteral(mockCtx, random.nextInt(11, 20).toDouble())
                 ),
-                NumberLiteral(generateNumber(random, 0, 10)),
-                "acc${random.nextInt(10)}",
-                "val${random.nextInt(10)}",
+                NumberLiteral(mockCtx, generateNumber(random, 0, 10)),
+                Identifier(mockCtx, "acc${random.nextInt(10)}"),
+                Identifier(mockCtx, "val${random.nextInt(10)}"),
                 generateRandomExpression(random)
             )
             else -> throw IllegalStateException("Unexpected random value")
@@ -94,3 +96,4 @@ class ASTGenerator {
         }
     }
 }
+

@@ -32,34 +32,37 @@ WS           : [ \t\r\n]+ -> skip ;
 
 
 // Parser rules
-program      : stmt+ ;
+program      : stmt+ EOF ;
 
 stmt         : varDecl
              | outputStmt
              | printStmt
              ;
 
-varDecl      : VAR IDENTIFIER ASSIGN expr ;
+varDecl      : VAR identifier ASSIGN expr ;
 
 outputStmt   : OUT expr ;
 
 printStmt    : PRINT STRING ;
 
-expr         : expr op=PLUS expr
-             | expr op=MINUS expr
+expr         : expr op=POWER expr
              | expr op=MULTIPLY expr
              | expr op=DIVIDE expr
-             | expr op=POWER expr
+             | expr op=PLUS expr
+             | expr op=MINUS expr
              | LPAREN expr RPAREN
-             | IDENTIFIER
              | sequence
-             | NUMBER
              | mapExpr
              | reduceExpr
+             | IDENTIFIER
+             | NUMBER
              ;
 
-sequence     : LBRACE expr COMMA expr RBRACE ;
+sequence         : LBRACE expr COMMA expr RBRACE ;
 
-mapExpr      : MAP LPAREN expr COMMA IDENTIFIER ARROW expr RPAREN ;
+mapExpr          : MAP LPAREN expr COMMA identifier ARROW expr RPAREN ;
 
-reduceExpr   : REDUCE LPAREN expr COMMA expr COMMA IDENTIFIER IDENTIFIER ARROW expr RPAREN ;
+reduceExpr       : REDUCE LPAREN expr COMMA expr COMMA identifier identifier ARROW expr RPAREN ;
+
+identifier       : IDENTIFIER ;
+

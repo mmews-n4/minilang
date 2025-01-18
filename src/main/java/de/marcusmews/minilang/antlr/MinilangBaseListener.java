@@ -120,6 +120,18 @@ public class MinilangBaseListener implements MinilangListener {
 	 * <p>The default implementation does nothing.</p>
 	 */
 	@Override public void exitReduceExpr(MinilangParser.ReduceExprContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void enterIdentifier(MinilangParser.IdentifierContext ctx) { }
+	/**
+	 * {@inheritDoc}
+	 *
+	 * <p>The default implementation does nothing.</p>
+	 */
+	@Override public void exitIdentifier(MinilangParser.IdentifierContext ctx) { }
 
 	/**
 	 * {@inheritDoc}

@@ -3,10 +3,7 @@ package de.marcusmews.minilang
 import de.marcusmews.minilang.analysis.ProgramBuilder
 import de.marcusmews.minilang.antlr.createParser
 import de.marcusmews.minilang.ast.*
-import de.marcusmews.minilang.validation.StdOutIssueHandler
-import de.marcusmews.minilang.validation.DeclarationValidator
-import de.marcusmews.minilang.validation.Issue
-import de.marcusmews.minilang.validation.StructureValidator
+import de.marcusmews.minilang.validation.*
 
 class Core(private var source: String) {
     private val issueHandler = StdOutIssueHandler()
@@ -14,20 +11,25 @@ class Core(private var source: String) {
 
     fun parse() : Core {
         if (programInfo == null) {
-            val astInfo = ASTBuilder().build(createParser(source, issueHandler).program())
-            programInfo = ProgramBuilder().build(astInfo)
+            try {
+                val astInfo = ASTBuilder().build(createParser(source, issueHandler).program())
+                programInfo = ProgramBuilder().build(astInfo)
+            } catch (e: ASTBuilderException) {
+                val range = getRange(e.ctx)
+                issueHandler.replaceIssue(IssueKind.Error, range, e.message ?: "")
+            }
         }
         return this
     }
 
     fun validate() : Core {
         if (programInfo == null) {
-            throw IllegalStateException("Missing AST or source locations")
-        }
-        if (issueHandler.issues.isEmpty()) {
+            // errors during parsing or AST construction
+        } else if (issueHandler.issues.isEmpty()) {
             val validators = listOf(
                 StructureValidator(issueHandler, programInfo!!),
-                DeclarationValidator(issueHandler, programInfo!!)
+                DeclarationValidator(issueHandler, programInfo!!),
+                TypeValidator(issueHandler, programInfo!!)
                 // add more validators here
             )
             traverse(programInfo!!, validators)

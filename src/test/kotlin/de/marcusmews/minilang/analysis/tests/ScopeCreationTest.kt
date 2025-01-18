@@ -29,7 +29,7 @@ class ScopeCreationTest {
             var expectedScopeCount = 0
 
             traverse(programInfo, listOf(object : ASTVisitor(){
-                override fun onSourceElement(node: SourceElement, parent: SourceElement?, parentProperty: String?) {
+                override fun onSourceElement(node: SourceElement, parent: SourceElement?, partType: SourceElementPart?) {
                     when (node) {
                         is Program          -> { expectedScopeCount++ }
                         is MapExpression    -> { expectedScopeCount++ }

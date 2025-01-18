@@ -1,5 +1,6 @@
 package de.marcusmews.minilang.validation
 
+import de.marcusmews.minilang.analysis.getDeclarationIdentifier
 import de.marcusmews.minilang.ast.*
 
 /**
@@ -7,23 +8,27 @@ import de.marcusmews.minilang.ast.*
  */
 class DeclarationValidator(issueHandler: IssueHandler, programInfo: ProgramInfo): BaseValidator(issueHandler, programInfo) {
 
-    override fun onIdentifierExpression(node: IdentifierExpression, parent: SourceElement?, parentProperty: String?) {
+    override fun onIdentifierExpression(node: IdentifierExpression, parent: SourceElement?, partType: SourceElementPart?) {
         checkDeclarationMissing(node)
     }
 
-    override fun onProgram(node: Program, parent: SourceElement?, parentProperty: String?) {
+    override fun onProgram(node: Program, parent: SourceElement?, partType: SourceElementPart?) {
         checkDeclarationCollision(node)
         checkDeclarationHiding(node)
     }
 
-    override fun onMapExpression(node: MapExpression, parent: SourceElement?, parentProperty: String?) {
-        checkDeclarationCollision(node)
-        checkDeclarationHiding(node)
+    override fun onMapExpression(node: MapExpression, parent: SourceElement?, partType: SourceElementPart?) {
+        if (node.body != null) {
+            checkDeclarationCollision(node.body)
+            checkDeclarationHiding(node.body)
+        }
     }
 
-    override fun onReduceExpression(node: ReduceExpression, parent: SourceElement?, parentProperty: String?) {
-        checkDeclarationCollision(node)
-        checkDeclarationHiding(node)
+    override fun onReduceExpression(node: ReduceExpression, parent: SourceElement?, partType: SourceElementPart?) {
+        if (node.body != null) {
+            checkDeclarationCollision(node.body)
+            checkDeclarationHiding(node.body)
+        }
     }
 
 
@@ -36,7 +41,7 @@ class DeclarationValidator(issueHandler: IssueHandler, programInfo: ProgramInfo)
                 val declarations = scope.declarations.get(identifierName)
                 for ((idx, declPos) in declarations.withIndex()) {
                     if (idx > 0) {
-                        val srcElem: SourceElement? = getScopeRelatedElement(scope, declPos)
+                        val srcElem = getDeclarationIdentifier(scope, declPos)
                         if (srcElem != null) {
                             reportError(srcElem, "Identifier $identifierName already declared")
                         }
@@ -54,7 +59,8 @@ class DeclarationValidator(issueHandler: IssueHandler, programInfo: ProgramInfo)
             for (parentScope in scopes) {
                 if (parentScope != scope) {
                     if (parentScope.declarations.containsKey(identifierName)) {
-                        val srcElem: SourceElement? = getScopeRelatedElement(scope, 0)
+                        val declPos = scope.declarations[identifierName].first()
+                        val srcElem = getDeclarationIdentifier(scope, declPos)
                         if (srcElem != null) {
                             reportError(srcElem, "Identifier $identifierName hides a variable already declared in a parent scope")
                         }
@@ -64,29 +70,27 @@ class DeclarationValidator(issueHandler: IssueHandler, programInfo: ProgramInfo)
         }
     }
 
-    private fun getScopeRelatedElement(scope: Scope, declPos: Int): SourceElement? {
-        var srcElem: SourceElement? = null
-        when (scope.relatedElem) {
-            is Program          -> srcElem = scope.relatedElem.statements.getOrNull(declPos) // improve: mark identifier instead of hole statement
-            is MapExpression    -> srcElem = scope.relatedElem // this might never happen
-            is ReduceExpression -> srcElem = scope.relatedElem // improve: mark specific parameter instead of hole expression
-        }
-        return srcElem
-    }
-
     private fun checkDeclarationMissing(idExpr: IdentifierExpression) {
         val scopes = getScopes(programInfo, idExpr)
         var scopeIdExpr : Scope? = null
-        for (scope in scopes) {
+        var scopeIdExprIdx : Int = -1
+        for ((index, scope) in scopes.withIndex()) {
             if (scope.declarations.containsKey(idExpr.name)) {
                 scopeIdExpr = scope
+                scopeIdExprIdx = index
+                break
             }
         }
         if (scopeIdExpr == null) {
             reportError(idExpr, "Identifier ${idExpr.name} undeclared")
             return
         }
-        // scope founds means identifier is declared
+        // scope found means identifier is declared
+
+        checkTopLevelAccess(idExpr, scopes, scopeIdExpr) ?: return
+
+        checkParentLambdaAccess(idExpr, scopeIdExprIdx) ?: return
+
         if (scopeIdExpr.relatedElem is Program) {
             // check whether the identifier access happens before/after its declaration
             var stmtIdExpr : SourceElement = idExpr
@@ -95,13 +99,50 @@ class DeclarationValidator(issueHandler: IssueHandler, programInfo: ProgramInfo)
             }
             if (stmtIdExpr is Statement) {
                 val declPos = scopeIdExpr.declarations[idExpr.name]!!.first()
-                val stmtPos = getPosition(programInfo, stmtIdExpr)
+                val stmtPos = stmtIdExpr.position
                 if (declPos >= stmtPos) {
-                    reportError(idExpr, "Identifier ${idExpr.name} used before declaration")
+                    reportError(idExpr, "Variable ${idExpr.name} used before declaration")
                     return
                 }
             }
         }
     }
 
+    /**
+     * **Important note:**
+     *
+     * This checks whether the current IdentifierExpression is located inside a lambda
+     * but accesses a variable declared on top level. With respect to the
+     * assignment this is forbidden. However, this restriction can be removed
+     * at any time since its violation would not harm the program execution.
+     */
+    private fun checkTopLevelAccess(idExpr: IdentifierExpression, scopes: List<Scope>, scopeIdExpr: Scope) : Any? {
+        if (scopeIdExpr.relatedElem is Program) {
+            // the identifier was declared on program level / top level
+            if (scopes.size > 1) {
+                reportError(
+                    idExpr,
+                    "Identifier ${idExpr.name} declared on top level may not be accessed from lambda. (See note in validation)"
+                )
+                return null
+            }
+        }
+        return this
+    }
+
+    /**
+     * **Important note**
+     *
+     * This checks whether a variable declared in a parent lambda is accessed.
+     * With respect to the assignment this is forbidden. However, this restriction
+     * can be removed at any time since its violation would not harm the program
+     * execution.
+     */
+    private fun checkParentLambdaAccess(idExpr: IdentifierExpression, scopeIdExprIdx: Int) : Any? {
+        if (scopeIdExprIdx > 0) {
+            reportError(idExpr, "Variable ${idExpr.name} access to parent scope not allowed. (See note in validation)")
+            return null
+        }
+        return this
+    }
 }

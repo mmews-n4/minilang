@@ -33,7 +33,7 @@ class ASTParentsTest {
                 val parents = core.getProgramInfo()!!.parents
 
                 traverse(core.getProgramInfo()!!, listOf(object : ASTVisitor(){
-                    override fun onSourceElement(node: SourceElement, parent: SourceElement?, parentProperty: String?) {
+                    override fun onSourceElement(node: SourceElement, parent: SourceElement?, partType: SourceElementPart?) {
                         when (node) {
                             is Program  -> { /* has no parent */ }
                             else        -> assertNotNull(parents[node], "Missing parent of ${node::class}")

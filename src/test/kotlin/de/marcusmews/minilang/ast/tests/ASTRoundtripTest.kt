@@ -44,7 +44,7 @@ class ASTRoundtripTest {
                 // Print the parsed source
                 println("Source code of parsed AST $index:\n${parsedSource}\n\n")
 
-                assertEquals(generatedSource, parsedSource)
+                assertEquals(generatedSource, parsedSource, "Index $index")
             } catch (e: Exception) {
                 fail("Test failed for AST $index. Exception: ${e.message}", e)
             }

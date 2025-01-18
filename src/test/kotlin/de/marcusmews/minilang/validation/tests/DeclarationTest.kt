@@ -2,7 +2,7 @@ package de.marcusmews.minilang.validation.tests
 
 import de.marcusmews.minilang.Core
 import de.marcusmews.minilang.tests.utils.assertErrors
-import de.marcusmews.minilang.tests.utils.assertNoErrors
+import de.marcusmews.minilang.tests.utils.assertNoError
 import kotlin.test.*
 
 class DeclarationTest {
@@ -19,7 +19,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertNoErrors(core)
+        assertNoError(core)
     }
 
     @Test
@@ -30,7 +30,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertNoErrors(core)
+        assertNoError(core)
     }
 
     @Test
@@ -51,7 +51,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertErrors(core, "Error (0, 4): Identifier pi used before declaration")
+        assertErrors(core, "Error (0, 4): Variable pi used before declaration")
     }
 
     @Test
@@ -62,7 +62,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertNoErrors(core)
+        assertNoError(core)
     }
 
     @Test
@@ -83,7 +83,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertNoErrors(core)
+        assertNoError(core)
     }
 
     @Test
@@ -106,7 +106,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertNoErrors(core)
+        assertNoError(core)
     }
 
     @Test
@@ -131,7 +131,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertErrors(core, "Error (1, 0): Identifier pi already declared")
+        assertErrors(core, "Error (1, 4): Identifier pi already declared")
     }
 
     @Test
@@ -141,7 +141,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertErrors(core, "Error (0, 4): Identifier pi already declared")
+        assertErrors(core, "Error (0, 25): Identifier pi already declared")
     }
 
     @Test
@@ -152,7 +152,7 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertErrors(core, "Error (0, 9): Identifier pi hides a variable already declared in a parent scope")
+        assertErrors(core, "Error (0, 21): Identifier pi hides a variable already declared in a parent scope")
     }
 
     @Test
@@ -163,6 +163,17 @@ class DeclarationTest {
         """.trimIndent()
         val core = Core(source).parse().validate()
 
-        assertErrors(core, "Error (0, 9): Identifier pi hides a variable already declared in a parent scope")
+        assertErrors(core, "Error (0, 29): Identifier pi hides a variable already declared in a parent scope")
+    }
+
+    @Test
+    fun testAccessTopLevel() {
+        val source = """
+            var pi = 3.14
+            out reduce({0, 9}, 0, x y -> x + y + pi)
+        """.trimIndent()
+        val core = Core(source).parse().validate()
+
+        assertErrors(core, "Error (1, 37): Identifier pi declared on top level may not be accessed from lambda. (See note in validation)")
     }
 }

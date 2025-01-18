@@ -6,7 +6,7 @@ import kotlin.test.assertEquals
 import kotlin.test.assertTrue
 
 
-fun assertNoErrors(core: Core) {
+fun assertNoError(core: Core) {
     val issues = core.getIssues()
     assertEquals(0, issues.size, "Expected 0 issues but found: ${issues.joinToString()}")
 }

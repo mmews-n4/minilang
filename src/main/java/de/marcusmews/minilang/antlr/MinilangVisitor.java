@@ -64,4 +64,10 @@ public interface MinilangVisitor<T> extends ParseTreeVisitor<T> {
 	 * @return the visitor result
 	 */
 	T visitReduceExpr(MinilangParser.ReduceExprContext ctx);
+	/**
+	 * Visit a parse tree produced by {@link MinilangParser#identifier}.
+	 * @param ctx the parse tree
+	 * @return the visitor result
+	 */
+	T visitIdentifier(MinilangParser.IdentifierContext ctx);
 }

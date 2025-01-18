@@ -97,4 +97,14 @@ public interface MinilangListener extends ParseTreeListener {
 	 * @param ctx the parse tree
 	 */
 	void exitReduceExpr(MinilangParser.ReduceExprContext ctx);
+	/**
+	 * Enter a parse tree produced by {@link MinilangParser#identifier}.
+	 * @param ctx the parse tree
+	 */
+	void enterIdentifier(MinilangParser.IdentifierContext ctx);
+	/**
+	 * Exit a parse tree produced by {@link MinilangParser#identifier}.
+	 * @param ctx the parse tree
+	 */
+	void exitIdentifier(MinilangParser.IdentifierContext ctx);
 }
