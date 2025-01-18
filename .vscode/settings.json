@@ -1,0 +1,9 @@
+{
+  "antlr4.generation": {
+    "package": "de.marcusmews.minilang.antlr",
+    "outputDir": "../main/java/de/marcusmews/minilang/antlr",
+    "mode": "external",
+    "listeners": true,
+    "visitors": true
+  }
+}
