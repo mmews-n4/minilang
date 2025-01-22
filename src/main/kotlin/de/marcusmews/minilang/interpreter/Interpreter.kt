@@ -4,6 +4,7 @@ import de.marcusmews.minilang.analysis.isAssociative
 import de.marcusmews.minilang.ast.*
 import de.marcusmews.minilang.validation.Issue
 import kotlinx.coroutines.*
+import java.util.concurrent.Executors
 import kotlin.math.pow
 
 
@@ -73,13 +74,13 @@ class Interpreter(val program: Program, private val job: Job? = null) {
     private fun executeStatement(statement: Statement, variableStack: MutableMap<String, Any?>) {
         when (statement) {
             is VariableDeclaration -> {
-                val value = evaluateExpression(statement.expression, variableStack)
+                val value = evaluateExpression(statement.expression, variableStack, true)
                 if (statement.identifier != null) {
                     variableStack[statement.identifier.name] = value
                 }
             }
             is OutputStatement -> {
-                val value = evaluateExpression(statement.expression, variableStack)
+                val value = evaluateExpression(statement.expression, variableStack, true)
                 println(value)
             }
             is PrintStatement -> {
@@ -89,22 +90,22 @@ class Interpreter(val program: Program, private val job: Job? = null) {
     }
 
     /** Evaluate an expression */
-    private fun evaluateExpression(expression: Expression?, variableStack: Map<String, Any?>): Any? {
+    private fun evaluateExpression(expression: Expression?, variableStack: Map<String, Any?>, parallelizable: Boolean): Any? {
         return when (expression) {
-            is BinaryOperation          -> evaluateBinaryOperation(expression, variableStack)
-            is ParenthesizedExpression  -> evaluateExpression(expression.expression, variableStack)
+            is BinaryOperation          -> evaluateBinaryOperation(expression, variableStack, parallelizable)
+            is ParenthesizedExpression  -> evaluateExpression(expression.expression, variableStack, parallelizable)
             is IdentifierExpression     -> evaluateIdentifier(expression, variableStack)
             is NumberLiteral            -> expression.value
-            is SequenceExpression       -> evaluateSequence(expression, variableStack)
-            is MapExpression            -> evaluateMap(expression, variableStack)
-            is ReduceExpression         -> evaluateReduce(expression, variableStack)
+            is SequenceExpression       -> evaluateSequence(expression, variableStack, parallelizable)
+            is MapExpression            -> evaluateMap(expression, variableStack, parallelizable)
+            is ReduceExpression         -> evaluateReduce(expression, variableStack, parallelizable)
             null -> null
         }
     }
 
-    private fun evaluateBinaryOperation(expression: BinaryOperation, variableStack: Map<String, Any?>): Any {
-        val left = evaluateExpression(expression.left, variableStack)
-        val right = evaluateExpression(expression.right, variableStack)
+    private fun evaluateBinaryOperation(expression: BinaryOperation, variableStack: Map<String, Any?>, parallelizable: Boolean): Any {
+        val left = evaluateExpression(expression.left, variableStack, parallelizable)
+        val right = evaluateExpression(expression.right, variableStack, parallelizable)
 
         return when (expression.operator) {
             Operator.PLUS -> handleAddition(expression, left, right)
@@ -172,66 +173,129 @@ class Interpreter(val program: Program, private val job: Job? = null) {
         return variableStack[expression.name] ?: runtimeError(expression, "Undefined variable: ${expression.name}")
     }
 
-    private fun evaluateSequence(expression: SequenceExpression, variableStack: Map<String, Any?>): List<Double> {
-        val startValue = evaluateExpression(expression.start, variableStack)
+    private fun evaluateSequence(expression: SequenceExpression, variableStack: Map<String, Any?>, parallelizable: Boolean): List<Double> {
+        val startValue = evaluateExpression(expression.start, variableStack, parallelizable)
         val startDouble = startValue  as? Double ?:
-            runtimeError(expression.start ?: expression, "Invalid start of sequence. Value was $startValue")
+            runtimeError(expression.start ?: expression, "Invalid start of sequence. Expected Number but value was $startValue")
         val start = if (startDouble % 1 == 0.0) startDouble.toInt() else
             runtimeError(expression.start ?: expression, "Start of sequence must be Int but was $startDouble")
-        val endValue = evaluateExpression(expression.end, variableStack)
+        val endValue = evaluateExpression(expression.end, variableStack, parallelizable)
         val endDouble = endValue as? Double ?:
-            runtimeError(expression.end ?: expression, "Invalid end of sequence. Value was $endValue")
+            runtimeError(expression.end ?: expression, "Invalid end of sequence. Expected Number but value was $endValue")
         val end = if (endDouble % 1 == 0.0) endDouble.toInt() else
             runtimeError(expression.end ?: expression, "End of sequence must be Int but was $endDouble")
         if (start > end)
             runtimeError(expression, "Start of sequence must be less/equal than end but was $start > $end")
-        return (start..end).toList().map { value -> ensureJobActive(expression); value.toDouble() }
+
+        val result = List(end - start + 1) {
+            if (it % 10000 == 0) {
+                ensureJobActive(expression)
+            }
+            (it + start).toDouble()
+        }
+        return result
     }
 
-    private fun evaluateMap(expression: MapExpression, variableStack: Map<String, Any?>): List<Any?> = runBlocking {
-        val sequence = evaluateExpression(expression.sequence, variableStack) as? List<*> ?:
+    private fun evaluateMap(expression: MapExpression, variableStack: Map<String, Any?>, parallelizable: Boolean): List<Any?> {
+        val sequence = evaluateExpression(expression.sequence, variableStack, parallelizable) as? List<*> ?:
             runtimeError(expression.sequence ?: expression, "Invalid sequence for map") // prevented by validation
         val parameter = expression.parameter ?:
             runtimeError(expression, "Map parameter missing") // prevented by parser
 
-        sequence.map { item ->
-            async {
+        if (parallelizable && sequence.size > 1) {
+            val result = ArrayList<Any?>(sequence.size).apply { repeat(sequence.size) { add(null) } }
+            val numThreads = minOf(sequence.size, Runtime.getRuntime().availableProcessors())
+
+            Executors.newFixedThreadPool(numThreads).asCoroutineDispatcher().use { dispatcher ->
+                runBlocking {
+                    val chunkSize = sequence.size / numThreads
+                    val jobs = (0 until numThreads).map { threadIndex ->
+                        val start = threadIndex * chunkSize
+                        val end = if (threadIndex < numThreads - 1) {
+                                minOf(start + chunkSize, sequence.size)
+                            } else {
+                                sequence.size
+                            }
+
+                        async(dispatcher) {
+                            for (i in start until end) {
+                                ensureJobActive(expression)
+                                val item = sequence[i]
+                                val newVariableStack = variableStack + (parameter.name to item)
+                                result[i] = evaluateExpression(expression.body, newVariableStack, false)
+                            }
+                        }
+                    }
+
+                    jobs.awaitAll()
+                }
+            }
+            return result
+        } else {
+            return sequence.map { item ->
                 ensureJobActive(expression)
 
                 val newVariableStack = variableStack + (parameter.name to item)
-                evaluateExpression(expression.body, newVariableStack)
-            }
-        }.awaitAll()
-    }
-
-    private fun evaluateReduce(expression: ReduceExpression, variableStack: Map<String, Any?>): Any {
-        val sequence = evaluateExpression(expression.sequence, variableStack) as? List<Any?> ?:
-            runtimeError(expression.sequence ?: expression, "Invalid sequence for reduce") // prevented by validation
-        val initial = evaluateExpression(expression.initial, variableStack) ?:
-            runtimeError(expression.initial ?: expression, "Invalid initial for reduce") // prevented by validation
-        val param1 = expression.param1 ?: runtimeError(expression, "Reduce parameter 1 missing") // prevented by parser
-        val param2 = expression.param2 ?: runtimeError(expression, "Reduce parameter 2 missing") // prevented by parser
-
-        return if (isAssociative(expression.body)) {
-            // parallel version
-            val initialPlusSequence = listOf(initial) + sequence
-            initialPlusSequence.parallelStream().reduce { acc, item ->
-                evaluateReduceBody(expression, variableStack, param1.name, param2.name, acc, item)
-            }.get()
-        } else {
-            // sequential version
-            sequence.fold(initial) { acc, item ->
-                evaluateReduceBody(expression, variableStack, param1.name, param2.name, acc, item)
+                evaluateExpression(expression.body, newVariableStack, parallelizable)
             }
         }
     }
 
-    private fun evaluateReduceBody(expression: ReduceExpression, variableStack: Map<String, Any?>, param1: String, param2: String, acc: Any?, item: Any?) : Any {
+    private fun evaluateReduce(expression: ReduceExpression, variableStack: Map<String, Any?>, parallelizable: Boolean): Any {
+        val sequence = evaluateExpression(expression.sequence, variableStack, parallelizable) as? List<Any?> ?:
+            runtimeError(expression.sequence ?: expression, "Invalid sequence for reduce") // prevented by validation
+        val initial = evaluateExpression(expression.initial, variableStack, parallelizable) ?:
+            runtimeError(expression.initial ?: expression, "Invalid initial for reduce") // prevented by validation
+        val param1 = expression.param1 ?: runtimeError(expression, "Reduce parameter 1 missing") // prevented by parser
+        val param2 = expression.param2 ?: runtimeError(expression, "Reduce parameter 2 missing") // prevented by parser
+
+        if (parallelizable && sequence.size > 1 && isAssociative(expression.body)) {
+            // parallel version
+            val numThreads = minOf(sequence.size, Runtime.getRuntime().availableProcessors())
+            val accumulators = ArrayList<Any>(numThreads).apply { repeat(numThreads) { add( if (initial is List<*>) emptyList<Any?>() else 0.0 ) } }
+            accumulators[0] = initial
+
+            Executors.newFixedThreadPool(numThreads).asCoroutineDispatcher().use { dispatcher ->
+                runBlocking {
+                    val chunkSize = sequence.size / numThreads
+                    val jobs = (0 until numThreads).map { threadIndex ->
+                        val start = threadIndex * chunkSize
+                        val end = if (threadIndex < numThreads - 1) {
+                            minOf(start + chunkSize, sequence.size)
+                        } else {
+                            sequence.size
+                        }
+
+                        async(dispatcher) {
+                            for (i in start until end) {
+                                ensureJobActive(expression)
+                                accumulators[threadIndex] = evaluateReduceBody(expression, variableStack, false, param1.name, param2.name, accumulators[threadIndex], sequence[i])
+                            }
+                        }
+                    }
+
+                    jobs.awaitAll()
+                }
+            }
+
+            return accumulators.parallelStream().reduce { acc, item ->
+                evaluateReduceBody(expression, variableStack, false, param1.name, param2.name, acc, item)
+            }.get()
+
+        } else {
+            // sequential version
+             return sequence.fold(initial) { acc, item ->
+                evaluateReduceBody(expression, variableStack, parallelizable, param1.name, param2.name, acc, item)
+            }
+        }
+    }
+
+    private fun evaluateReduceBody(expression: ReduceExpression, variableStack: Map<String, Any?>, parallelizable: Boolean, param1: String, param2: String, acc: Any?, item: Any?) : Any {
         ensureJobActive(expression)
 
         val newVariableStack = variableStack + (param1 to acc) + (param2 to item)
         //println("reduce body with stack $newVariableStack")
-        return evaluateExpression(expression.body, newVariableStack) ?:
+        return evaluateExpression(expression.body, newVariableStack, parallelizable) ?:
             runtimeError(expression, "Invalid reduce body result")
     }
 
