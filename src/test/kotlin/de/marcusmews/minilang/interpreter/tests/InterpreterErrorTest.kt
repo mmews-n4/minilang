@@ -50,7 +50,7 @@ class InterpreterErrorTest {
         run("""
             out map(map({0, 3}, x -> {x, x + 1}), z -> {z, 5})
         """.trimIndent())
-            .assertError("Runtime Error (0, 44): Invalid start of sequence. Value was [0.0, 1.0]")
+            .assertError("Runtime Error (0, 44): Invalid start of sequence. Expected Number but value was [...")
             .assertNoOutput()
             .assertNoVariables()
     }
@@ -60,7 +60,7 @@ class InterpreterErrorTest {
         run("""
             out map(map({0, 3}, x -> {x, x + 1}), z -> {1, z})
         """.trimIndent())
-            .assertError("Runtime Error (0, 47): Invalid end of sequence. Value was [0.0, 1.0]")
+            .assertError("Runtime Error (0, 47): Invalid end of sequence. Expected Number but value was [...")
             .assertNoOutput()
             .assertNoVariables()
     }

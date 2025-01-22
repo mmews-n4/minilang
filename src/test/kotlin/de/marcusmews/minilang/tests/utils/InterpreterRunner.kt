@@ -30,7 +30,11 @@ class RunResult(private val output: String? = null, private val error: RuntimeEr
     }
     fun assertError(message: String) : RunResult {
         assertNotNull(error, "Error expected but none found")
-        assertEquals(message, error.toString())
+        if (message.endsWith("...")) {
+            assertTrue(error.toString().startsWith(message.substring(0, message.length - 3)), "Expected error to start with '$message' but was $error")
+        } else {
+            assertEquals(message, error.toString())
+        }
         return this
     }
     fun assertNoVariables() : RunResult {
