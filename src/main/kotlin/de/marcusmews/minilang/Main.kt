@@ -163,6 +163,7 @@ class MainState(val filePath: String?) {
             if (interpreter.getError() != null) {
                 setIssues(listOf(interpreter.getError()!!.asIssue()))
             } else {
+                clearIssues()
                 variables.value.putAll(interpreter.getVariables().mapValues {
                     e -> if (e.value is List<*> && (e.value as List<*>).size > 41) {
                         // ui performance
